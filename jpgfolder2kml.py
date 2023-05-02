@@ -5,7 +5,7 @@ import os, sys
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
-from pprint import pprint
+#from pprint import pprint
 import lxml.etree as ET
 import re 
 import mmap 
@@ -106,7 +106,7 @@ def get_usefuldetail(file_path, filename):
     image = Image.open(file_path)
     exif_dict = image_exif_to_dict(image)
     exif_dict.update(xmp_dict2)
-    pprint(exif_dict)
+    #pprint(exif_dict)
     
     if not exif_dict['GPSLatitude']: 
         raise "No gps data" # not suitable image
