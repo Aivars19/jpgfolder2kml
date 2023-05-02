@@ -21,6 +21,7 @@ Method 1:
 open windows command line or linux terminal into folder with images. 
 Run script here. 
 > python jpgfolder2kml.py 
+
 (if .py file is made executable you can skip python and run by script name). 
 
 Method 2:
