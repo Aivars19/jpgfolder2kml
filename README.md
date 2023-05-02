@@ -29,6 +29,9 @@ Run script with folder as parameter. (output kml file is saved in the given fold
 > python jpgfolder2kml.py c:\images\folder1
 
 Method 3: drop folder on script. 
+
 Method 3a: make .py script executable (windows or linux) and you can drop image folder on script. 
+
 Method 3b: use pyinstaller to create exe or linux executable  - now you can drop image folder on it. 
+
 Method 3c: place shortcut on Desktop, and drop image folder on it.  
