@@ -22,9 +22,13 @@ Prerequisites:
     pip install lxml Pillow geopy
 
 open command line into folder with images. Then run script here without parameters 
+
     python %USERPROFILE%\Downloads\jpgfolder2kml.py 
+
 open command line anywhere. Then run script here with image folder as parameter
+
     python %USERPROFILE%\Downloads\jpgfolder2kml.py "d:\DCIM\100MEDIA"
+
 
 ## make script executable
 associate .py with python (so doubleclicking will run it)
@@ -35,12 +39,17 @@ Now you can drop folder onto script and script will launch and do it's job.
 Prerequisites:
 - python3 with libraries lxml, Pillow, geopy
 - if you have pip, then run
+
     pip install lxml Pillow geopy
 
 open command line into folder with images. Then run script here without parameters 
+
     python3 $HOME\Downloads\jpgfolder2kml.py 
+
 open command line anywhere. Then run script here with image folder as parameter
+
     python3 $HOME\Downloads\jpgfolder2kml.py /media/user1/disk/DCIM/100MEDIA
+
 
 ## make drop-able shortcut
 Create .desktop file and place it on desktop. 
