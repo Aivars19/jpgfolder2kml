@@ -9,6 +9,15 @@ Functionality features:
 - pin has extrusion to ground. 
 - there is extra geometry added so that from each pin you see direction and frame field of view as triangle. 
 - works acceptably on large data sets - 500 images (2gb) shouldn't be issue for processing and for displaying in Earth 
+- tries to open google earth with created KML(s) at the end of processing
+
+# folder, argument, file placement
+
+- if script is launched with argument, and argument is folder, then script will process that folder
+- if script is launched without argument (or argument is not a valid folder), then script will process current working directory. 
+- script will process subdirectories as well (so you can drop folder with all year collected images)
+- output KML file is saved in processed folder (or subfolder), along with images. 
+- output KML is only generated if folder contained valid images (with gps tags, altitude... as from dji drone)
 
 # limitations
 tool is written and tested with dji mini2 output. It relies on common exif tags (datetime, gps, focal length), and also on dji specific tags saved in xmp (altitude, yaw). 
@@ -54,7 +63,9 @@ open command line anywhere. Then run script here with image folder as parameter
 ## make drop-able shortcut
 Create .desktop file and place it on desktop. 
 See help about .desktop elsewhere, related to current script this should help: 
+
     Exec=python3 /home/user1/Downloads/jpgfolder2kml.py %U
     MimeType=inode/directory;
+
 Now you can drop folder onto shortcut and sript will launch and do it's job. 
 
