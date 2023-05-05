@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys
+import os, sys, platform, subprocess
 
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
@@ -141,27 +141,7 @@ def get_usefuldetail(file_path, filename):
     details['filename'] = filename
     return details
 
-
-def process_folder_to_data():
-    # create list, with images, will be ordered list
-    image_list = []        
-    for filename in os.listdir(folder_path):
-        if not filename.lower().endswith(".jpg"): 
-            continue
-        
-        file_path = os.path.join(folder_path, filename)
-        
-        try: 
-            details = get_usefuldetail(file_path, filename)
-            image_list.append(details)
-            print(f"{filename}: {details['point'].longitude} {details['point'].latitude}")
-        except:
-            print(f"{filename}: ignored, no GPS information (or yaw or altitude), possibly not DJI file")
-    
-    image_list.sort(key=lambda x: x['DateTime'])
-    return image_list
-
-def list_to_kml(image_list):
+def list_to_kml(image_list, folder_path):
     if not image_list: 
         print("No suitable images in folder")
         return
@@ -201,6 +181,7 @@ def list_to_kml(image_list):
     document.append(ET.XML(f'''
         <Placemark>
             <name>shooting directions</name>
+            <visibility>0</visibility>
             <styleUrl>#shootline</styleUrl>
             <MultiGeometry>{shootdirections_xml}</MultiGeometry>
         </Placemark>''', parser=parser))
@@ -240,18 +221,47 @@ def list_to_kml(image_list):
                 </Point>
             </Placemark>''', parser=parser))
 
-    with open(os.path.join(folder_path, kml_filename), "wb") as f:
+    kml_file_path = os.path.join(folder_path, kml_filename)
+    with open(kml_file_path, "wb") as f:
         tree  = ET.ElementTree(kml)
         #tree.write(f, pretty_print=True)
         tree.write(f, pretty_print=True, encoding='UTF-8', xml_declaration=True, method='xml')
+    
+    if platform.system() == 'Darwin':       # macOS
+        subprocess.call(('open', kml_file_path))
+    elif platform.system() == 'Windows':    # Windows
+        os.startfile(kml_file_path)
+    else:                                   # linux variants
+        subprocess.call(('xdg-open', kml_file_path))
+
+
+
+def process_folder_to_data(folder_path):
+    # create list, with images, will be ordered list
+    image_list = []        
+    for filename in os.listdir(folder_path):
+        
+        full_path = os.path.join(folder_path, filename)
+        if os.path.isdir(full_path): 
+            process_folder_to_data(full_path)
+            
+        if not filename.lower().endswith(".jpg"): 
+            continue
+        
+        try: 
+            details = get_usefuldetail(full_path, filename)
+            image_list.append(details)
+            print(f"{filename}: {details['point'].longitude} {details['point'].latitude}")
+        except:
+            print(f"{filename}: ignored, no GPS information (or yaw or altitude), possibly not DJI file")
+    
+    image_list.sort(key=lambda x: x['DateTime'])
+    list_to_kml(image_list, folder_path)
+
 
 if sys.argv[-1] and os.path.isdir(sys.argv[-1]): 
     folder_path = sys.argv[-1]
 else: 
     folder_path = os.getcwd()
 
-a = process_folder_to_data()
-    
-#for i in a:
-#    pprint(i)
-list_to_kml(a)
+process_folder_to_data(folder_path)
