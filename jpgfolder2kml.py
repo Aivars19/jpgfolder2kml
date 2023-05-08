@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
-import os, sys, platform, subprocess, math, psutil
+import os, sys, platform, subprocess, math, re, mmap, time
+
+import psutil
+import numpy
+from pprint import pprint
 
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
-from pprint import pprint
 import lxml.etree as ET
-import re 
-import mmap 
-import numpy
-import time
 
 parser = ET.XMLParser(remove_blank_text=True)
 
