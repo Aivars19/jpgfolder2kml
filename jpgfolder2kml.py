@@ -96,7 +96,7 @@ def exif_dict_from_file(file_path):
     
     if DEBUG_PRINT: pprint(exif_dict)
     
-    if not exif_dict['GPSLatitude']: 
+    if 'GPSLatitude' not in exif_dict or 'GPSLongitude' not in exif_dict: 
         raise "No gps data" # not suitable image
     return exif_dict
 
@@ -190,7 +190,7 @@ def make_frameonground(details):
     else: 
         frame_vectors += frame_corner_vectors(focal_length_35mm_equivalent, frame_width_pixels, frame_height_pixels, 1.4)
         frame_vectors.append(frame_vectors[-4])
-        details['pixel_size_mrad'] = pixel_size_mrad(focal_length_35mm_equivalent, frame_width_pixels, frame_height_pixels, 1.4)
+        details['pixel_size_mrad'] = 1000 / get_focal_length_pixels(focal_length_35mm_equivalent, frame_width_pixels, frame_height_pixels, 1.4)
     
     for frame_vector in frame_vectors:
         corners.append(geo_move(lon_lat_alt, normalize_z(rotate_z(rotate_x(frame_vector, pitch), azimuth), alt_offset)))
@@ -200,38 +200,54 @@ def make_frameonground(details):
 
 # ===== process file into useful detail (useful exif,xmp + calculate frame) === 
 def get_usefuldetail(file_path, filename):
-    def convert_to_degrees(value):
-        d, m, s = value
+    def convert_to_degrees(key):
+        d, m, s = exif_dict[key]
         return d + (m / 60.0) + (s / 3600.0)
 
-    def safer_float(x):
+    def safer_float(key, value_if_empty = 0.0):
         # simply calling float will have div by zero errors on some values (such as nan)
         try:
-            return float(x)
+            return float(exif_dict[key]) if key in exif_dict else value_if_empty
         except:
-            return 0.0
+            return value_if_empty
+    def safer_value(key, value_if_empty = None): 
+        return exif_dict[key] if key in exif_dict else value_if_empty
 
     details = {}
     exif_dict = exif_dict_from_file(file_path)
     
+    details['GPSAltitude'] = safer_value('GPSAltitude')
+    details['RelativeAltitude'] = safer_value('RelativeAltitude', 1.0)
+    
+    if convert_to_degrees('GPSLongitude') == 0: 
+        raise "GPS coordinates are zeros"
+    
     details['lon_lat_alt'] = (
-        convert_to_degrees(exif_dict['GPSLongitude']), 
-        convert_to_degrees(exif_dict['GPSLatitude']),
-        safer_float(exif_dict['RelativeAltitude']))
-    details['FlightPitchDegree'] = safer_float(exif_dict['FlightPitchDegree'])
-    details['FlightYawDegree'] = safer_float(exif_dict['FlightYawDegree'])
-    details['DateTime'] = exif_dict['DateTime']
-    details['GimbalPitchDegree'] = safer_float(exif_dict['GimbalPitchDegree'])
-    details['GimbalYawDegree'] = safer_float(exif_dict['GimbalYawDegree'])
+        convert_to_degrees('GPSLongitude'), 
+        convert_to_degrees('GPSLatitude'),
+        safer_float('RelativeAltitude'))
+    details['FlightPitchDegree'] = safer_float('FlightPitchDegree')
+    details['FlightYawDegree'] = safer_float('FlightYawDegree')
+    details['DateTimeOriginal'] = safer_value('DateTime', '0-DATE')
+    details['DateTime'] = safer_value('DateTime', details['DateTimeOriginal'])
+    details['GimbalPitchDegree'] = safer_float('GimbalPitchDegree')
+    details['GimbalYawDegree'] = safer_float('GimbalYawDegree')
     
-    details['camera_pitch_assumed'] = details['GimbalPitchDegree'] if details['GimbalPitchDegree'] else PITCH_IF_NOT_REDABLE
-    details['camera_azimuth_assumed'] = details['GimbalYawDegree'] if details['GimbalYawDegree'] else details['FlightYawDegree']
+    details['camera_pitch_assumed'] = safer_float('GimbalPitchDegree', 0.0)
+    details['camera_azimuth_assumed'] = safer_float('GimbalYawDegree', 0.0)
+    if not details['camera_azimuth_assumed']: 
+        details['camera_azimuth_assumed'] = details['FlightYawDegree']
+    if not details['camera_pitch_assumed']:
+        details['camera_pitch_assumed'] = PITCH_IF_NOT_REDABLE
+        
+    details['FocalLengthIn35mmFilm'] = safer_float('FocalLengthIn35mmFilm')
+    details['DigitalZoomRatio'] = safer_float('DigitalZoomRatio')
+    details['ExifImageWidth'] = safer_float('ExifImageWidth')
+    details['ExifImageHeight'] = safer_float('ExifImageHeight')
+    details['Model'] = safer_value('Model')
     
-    details['FocalLengthIn35mmFilm'] = safer_float(exif_dict['FocalLengthIn35mmFilm'])
-    details['DigitalZoomRatio'] = safer_float(exif_dict['DigitalZoomRatio'])
-    details['ExifImageWidth'] = safer_float(exif_dict['ExifImageWidth'])
-    details['ExifImageHeight'] = safer_float(exif_dict['ExifImageHeight'])
-    details['Model'] = exif_dict['Model']
+    if details['Model']== 'FC7303':
+        details['FocalLengthIn35mmFilm'] = 27.4 # corrected value using actual images (24 reported, 28.5 actual measured)
     
     iconname = filename
     if iconname.startswith('DJI_'): iconname = iconname[4:]
@@ -244,7 +260,37 @@ def get_usefuldetail(file_path, filename):
 # ===== process list of image details into KML file  ==========================
 def list_to_kml(image_list, folder_path):
     def kml_point(lon_lat_alt):
-        return ','.join([str(x) for x in lon_lat_alt])
+        return f"{lon_lat_alt[0]:.6f},{lon_lat_alt[1]:.6f},{lon_lat_alt[2]:.1f}"
+        #return ','.join([f"{str(x):.6f}" for x in lon_lat_alt])
+    def get_distance_meters(lon_lat1, lon_lat2):
+        R = 6371000
+        
+        lon1, lat1 = math.radians(lon_lat1[0]), math.radians(lon_lat1[1])
+        lon2, lat2 = math.radians(lon_lat2[0]), math.radians(lon_lat2[1])
+        
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        distance = R * c
+        
+        return distance
+
+    def get_azimuth_degrees(lon_lat1, lon_lat2):
+        lon1, lat1 = math.radians(lon_lat1[0]), math.radians(lon_lat1[1])
+        lon2, lat2 = math.radians(lon_lat2[0]), math.radians(lon_lat2[1])
+        
+        dlon = lon2 - lon1
+        
+        y = math.sin(dlon) * math.cos(lat2)
+        x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+        azimuth = math.degrees(math.atan2(y, x))
+        
+        if azimuth < 0:
+            azimuth += 360
+        
+        return azimuth
 
     if not image_list: 
         print("No suitable images in folder")
@@ -276,6 +322,9 @@ def list_to_kml(image_list, folder_path):
         </Placemark>''', parser=parser))
 
     shoot_directions_xml = ''
+    
+    prev_lon_lat = None
+    
     for d in image_list:
         frameonground = d['frameonground'][:2] # first two points are direction
         shoot_directions_xml += f'''
@@ -291,14 +340,23 @@ def list_to_kml(image_list, folder_path):
         </Placemark>''', parser=parser))
 
     folder = ET.SubElement(document, 'Folder')
-    ET.SubElement(folder, 'name').text='Drone images'
+    ET.SubElement(folder, 'name').text=f"Drone images ({len(image_list)})"
     for d in image_list:
+        description1 = f"DateTime {d['DateTime']} azimuth {d['camera_azimuth_assumed']} altitude {d['lon_lat_alt'][2]}"
+        description2 = f"GimbalPitchDegree {d['GimbalPitchDegree']} FlightPitchDegree {d['FlightPitchDegree']} "
+        description2 += f"pitch {d['camera_pitch_assumed']} focal35mm {d['FocalLengthIn35mmFilm']} "
+        description2 += f"zoom {d['DigitalZoomRatio']} pixel_size_mrad {d['pixel_size_mrad']:0.3f} "
+        if (prev_lon_lat):
+            description2 += f"dist_from_last {get_distance_meters(prev_lon_lat, d['lon_lat_alt']):.1f} "
+            description2 += f"azimuth_from_last {get_azimuth_degrees(prev_lon_lat, d['lon_lat_alt']):.1f} "
+        prev_lon_lat = d['lon_lat_alt']
+        
         folder.append(ET.XML(f'''
             <Folder><name>{d['iconname']}</name>
             <Placemark>
                 <name>{d['iconname']}</name>
                 <description><![CDATA[<img style="max-width:500px;" src="{d['filename']}">]]>
-                DateTime: {d['DateTime']}, azimuth: {d['camera_azimuth_assumed']}, altitude: {d['lon_lat_alt'][2]}
+                {description1}
                 </description>
                 <Point>
                     <extrude>1</extrude>
@@ -308,11 +366,7 @@ def list_to_kml(image_list, folder_path):
             </Placemark>
             <Placemark>
                 <name>Frame</name>
-                <description>
-                GimbalPitchDegree: {d['GimbalPitchDegree']} FlightPitchDegree: {d['FlightPitchDegree']} pitch_assumed: {d['camera_pitch_assumed']}
-                focal35mm: {d['FocalLengthIn35mmFilm']} zoom: {d['DigitalZoomRatio']} pixel_size_mrad {d['pixel_size_mrad']}
-
-                </description>
+                <description>{description2}</description>
                 <visibility>0</visibility>
                 <styleUrl>#shootframe</styleUrl>
                 <LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>{' '.join([kml_point(p) for p in d['frameonground']])}</coordinates></LineString>
@@ -329,21 +383,7 @@ def list_to_kml(image_list, folder_path):
 
 def open_google_earth_end():
     if not global_kml_list: return
-    
-    if platform.system() == 'Darwin':       
-        # we are in macOS
-        for kml_file_path in global_kml_list:
-            subprocess.call(('open', kml_file_path))
-    elif platform.system() == 'Windows':    
-        # we are in Windows
-        for kml_file_path in global_kml_list:
-            os.startfile(kml_file_path)
-    else:                                   
-        # we are in linux variants
-        open_in_linux()
 
-
-def open_in_linux():
     if len(global_kml_list) > 1: 
         kml_filename = f'set_of_{len(global_kml_list)}_files.kml'
         
@@ -362,7 +402,23 @@ def open_in_linux():
         with open(kml_file_path, "wb") as f:
             tree  = ET.ElementTree(kml)
             tree.write(f, pretty_print=True, encoding='UTF-8', xml_declaration=True, method='xml')
+    else: 
+        kml_file_path = global_kml_list[0]
 
+    
+    if platform.system() == 'Darwin':       
+        # we are in macOS
+        subprocess.call(('open', kml_file_path))
+    elif platform.system() == 'Windows':    
+        # we are in Windows
+        os.startfile(kml_file_path)
+    else:                                   
+        # we are in linux variants
+        open_in_linux(kml_file_path)
+
+
+def open_in_linux(kml_file_path):
+        
     # let me explain - there is no way to open kml in google earth if google earth is already running
     # (apart from hijacking mouse)
     # so for linux we create single joined kml and place it folder
@@ -383,8 +439,9 @@ global_kml_list = []
 # ===== MAIN PROCESSOR FOR PROVIDED FOLER ==== 
 def process_folder_to_data(folder_path):
     # create list, with images, will be ordered list
+    COUNTERS['folders'] += 1
     print(f"   === processing folder {folder_path}===")
-    image_list = []        
+    image_list = []
     for filename in os.listdir(folder_path):
         
         full_path = os.path.join(folder_path, filename)
@@ -393,6 +450,8 @@ def process_folder_to_data(folder_path):
             
         if not filename.lower().endswith(".jpg"): 
             continue
+        
+        COUNTERS['jpg_files'] += 1
         
         if DEBUG_PRINT:
             details = get_usefuldetail(full_path, filename)
@@ -406,6 +465,7 @@ def process_folder_to_data(folder_path):
                 print(f"{filename}: {details['lon_lat_alt']}")
             except:
                 print(f"{filename}: ignored, no GPS information (or yaw or altitude), possibly not DJI file")
+                COUNTERS['jpg_err']+=1
     
     image_list.sort(key=lambda x: x['DateTime'])
     list_to_kml(image_list, folder_path)
@@ -418,10 +478,19 @@ else:
 
 
 # can change while debugging. 
-DEBUG_PRINT = False
+DEBUG_PRINT = 0 # True or False (1 or 0)
 PITCH_IF_NOT_REDABLE = -45.0 # -45 normal
 GROUND_FRAME_HEIGHT = 1 # set higher for uneven terrain. 
+COUNTERS = {'folders': 0, 'jpg_files': 0, 'jpg_err': 0, 'kml_files': 0}
 
 # ACTION STARTS HERE
+start_time = time.time()
+
 process_folder_to_data(folder_path)
 open_google_earth_end()
+
+COUNTERS['kml_files'] = len(global_kml_list)
+
+end_time = time.time()
+print(f"Elapsed {end_time-start_time:.1f}s. (folders {COUNTERS['folders']} jpg_files {COUNTERS['jpg_files']} kml_files {COUNTERS['kml_files']})")
+if COUNTERS['jpg_err']: print(f" {COUNTERS['jpg_err']} jpg files coud not be processed")
