@@ -1,15 +1,31 @@
 # what jpgfolder2kml does
 It processes folder with images (as taken from dji drone) and generate single kml file that can be opened with Google Earth. 
-Functionality features:
-- kml file is named based on last image datetime. (if you open several folders in Earth - file name should help you understand which is which). 
-- kml contains flight path as blue, altitude adjusted line. 
-- kml shows every picture as pin. If pictures are named as DJI_0000.JPG, then only number is shown. Else - file name is shown. 
-- pin has image link added, so clicking on pin will show image preview (with additional click can open full image inside GE). 
-- pin is located at altitude
-- pin has extrusion to ground. 
-- there is extra geometry added so that from each pin you see direction and frame field of view as triangle. 
-- works acceptably on large data sets - 500 images (2gb) shouldn't be issue for processing and for displaying in Earth 
-- tries to open google earth with created KML(s) at the end of processing
+Main functionality:
+
+- it will process folder (or tree of folders) into Google Earth Pro compatible KML file(s)
+  - it will work acceptably fast on large data sets - both folder processing and showing KML with, say, 5000 images should be workable.  
+  - kml file is named from last image datetime. (if you open several folders in Earth - file name should help you understand which is which). 
+
+- kml shows every picture as pin. 
+  - If pictures are named as DJI_0000.JPG, then only number is shown. Else - file name is shown. 
+  - pin is located at altitude
+  - pin has extrusion to ground - so you see precise location
+  - pin has image link added, so clicking on pin will show image preview (with additional click can open full image inside GE). 
+  - pin description contains more textual details extracted from file (date, azimuth, height)
+
+- kml shows flight path as blue, altitude adjusted line.
+  - line is in separate geometry, so can be turned on/off
+
+- kml shows direction of camera
+  - they point to ground where frame center should be
+  - pitch angle relies on GimbalPitchDegree tag from file. DJIMini2 does not report gimbal pitch. Bigger DJI drones do report it. If not reported, -45 degrees assumed. 
+  
+- kml contains calculated ground frame for each pin
+  - it is hidden by default
+  - based on reported pitch, zoom, fov, directions - calculates what portion of ground is in frame. 
+  - note that frame will be approximate: FOV reported is not precise, compass azimuth can be a few degrees off, when drone is in movement (or fights wind) pitch might be misreported some degrees, gps might be off some meters, altitude is relative to start point-not current point, digital zoom is not always reported .... etc. 
+
+- script will try to open google earth with created KML(s) at the end of processing
 
 # folder, argument, file placement
 
@@ -20,15 +36,15 @@ Functionality features:
 - output KML is only generated if folder contained valid images (with gps tags, altitude... as from dji drone)
 
 # limitations
-tool is written and tested with dji mini2 output. It relies on common exif tags (datetime, gps, focal length), and also on dji specific tags saved in xmp (altitude, yaw). 
-dji mini2 unfortunately does not save gimbal value (tag exists), so pitch of picture is not reported. Directional triangles show 45 degree angle when over 50m above ground, or flatter angle if close to ground. 
+Tool is written and tested with dji mini2 output. It relies on common exif tags (datetime, gps, focal length), and also on dji specific tags saved in xmp (altitude, yaw). DJI mini2 unfortunately does not save gimbal value (tag exists but is always 0), so pitch of picture is not reported.  
 
 # how to use on Windows
 ## run as script
 Prerequisites:
-- python3 with libraries lxml, Pillow, geopy
+- python3 with libraries lxml, Pillow, geopy, numpy, psutil
 - if you have pip, then run
-    pip install lxml Pillow geopy
+<!-- -->
+    pip install lxml Pillow geopy numpy psutil
 
 open command line into folder with images. Then run script here without parameters 
 
@@ -46,10 +62,10 @@ Now you can drop folder onto script and script will launch and do it's job.
 # how to use on Linux
 ## run as script
 Prerequisites:
-- python3 with libraries lxml, Pillow, geopy
+- python3 with libraries lxml, Pillow, geopy, numpy, psutil
 - if you have pip, then run
-
-    pip install lxml Pillow geopy
+<!-- -->
+    pip install lxml Pillow geopy numpy psutil
 
 open command line into folder with images. Then run script here without parameters 
 
