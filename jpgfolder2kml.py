@@ -492,7 +492,7 @@ else:
 
 
 # can change while debugging. 
-DEBUG_PRINT = 1 # True or False (1 or 0)
+DEBUG_PRINT = 0 # True or False (1 or 0)
 PITCH_IF_NOT_REDABLE = -45.0 # -45 normal
 GROUND_FRAME_HEIGHT = 1 # set higher for uneven terrain. 
 COUNTERS = {'folders': 0, 'jpg_files': 0, 'jpg_err': 0, 'kml_files': 0}

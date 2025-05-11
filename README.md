@@ -1,5 +1,5 @@
 # what jpgfolder2kml does
-It processes folder with images (as taken from dji drone) and generate single kml file that can be opened with Google Earth. 
+It processes folder with images (as taken from dji/autel drone) and generate single kml file that can be opened with Google Earth. 
 Main functionality:
 
 - it will process folder (or tree of folders) into Google Earth Pro compatible KML file(s)
