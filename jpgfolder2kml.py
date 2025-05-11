@@ -217,15 +217,11 @@ def get_usefuldetail(file_path, filename):
     exif_dict = exif_dict_from_file(file_path)
     
     details['GPSAltitude'] = safer_value('GPSAltitude')
-    details['RelativeAltitude'] = safer_value('RelativeAltitude', 1.0)
+    details['camera_alt_assumed'] = safer_float('RelativeAltitude', 1.0)
     
     if convert_to_degrees('GPSLongitude') == 0: 
         raise "GPS coordinates are zeros"
     
-    details['lon_lat_alt'] = (
-        convert_to_degrees('GPSLongitude'), 
-        convert_to_degrees('GPSLatitude'),
-        safer_float('RelativeAltitude'))
     details['FlightPitchDegree'] = safer_float('FlightPitchDegree')
     details['FlightYawDegree'] = safer_float('FlightYawDegree')
     details['DateTimeOriginal'] = safer_value('DateTime', '0-DATE')
@@ -239,6 +235,7 @@ def get_usefuldetail(file_path, filename):
         details['camera_azimuth_assumed'] = details['FlightYawDegree']
     if not details['camera_pitch_assumed']:
         details['camera_pitch_assumed'] = PITCH_IF_NOT_REDABLE
+    
         
     details['FocalLengthIn35mmFilm'] = safer_float('FocalLengthIn35mmFilm')
     details['DigitalZoomRatio'] = safer_float('DigitalZoomRatio')
@@ -248,6 +245,20 @@ def get_usefuldetail(file_path, filename):
     
     if details['Model']== 'FC7303':
         details['FocalLengthIn35mmFilm'] = 27.4 # corrected value using actual images (24 reported, 28.5 actual measured)
+
+    if details['Model']== 'XL801': 
+        # AUTEL 4T
+        details['camera_pitch_assumed'] = safer_float('Pitch')
+        details['camera_azimuth_assumed'] = safer_float('Yaw')
+        details['camera_alt_assumed'] = safer_float('AboveGroundAltitude') - safer_float('LRFTargetAbsAlt')
+        details['DigitalZoomRatio'] = 0.0 # already included in 35mm focal
+
+
+    details['lon_lat_alt'] = (
+        convert_to_degrees('GPSLongitude'), 
+        convert_to_degrees('GPSLatitude'),
+        details['camera_alt_assumed'])
+
     
     iconname = filename
     if iconname.startswith('DJI_'): iconname = iconname[4:]
@@ -478,7 +489,7 @@ else:
 
 
 # can change while debugging. 
-DEBUG_PRINT = 0 # True or False (1 or 0)
+DEBUG_PRINT = 1 # True or False (1 or 0)
 PITCH_IF_NOT_REDABLE = -45.0 # -45 normal
 GROUND_FRAME_HEIGHT = 1 # set higher for uneven terrain. 
 COUNTERS = {'folders': 0, 'jpg_files': 0, 'jpg_err': 0, 'kml_files': 0}
