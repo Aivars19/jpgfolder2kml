@@ -38,7 +38,10 @@ from geopy import Point
             xmp key names are shortened only to include related name
         3) note that gimbalpitch is not availalbe in dji mini 2 data; this is dji intentional decision; 
         4) red line indicating direction is 50m offset to drone yaw direction. in typical situation it should help to understand direction. 
-        
+
+    2025-05 changed:
+        added autel 4T specific tag processing. (altitude, pitch, azimuth, zoom)
+
 '''
 
 
